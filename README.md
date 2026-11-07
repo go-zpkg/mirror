@@ -4,15 +4,27 @@
 ![Go](https://img.shields.io/badge/Go-1.27%2B-00ADD8?logo=go&logoColor=white)
 ![License](https://img.shields.io/badge/license-BSD--3--Clause-blue)
 
-Sync a **local mirror of pkgx bottles** from an upstream pkgx distribution. It
-writes the same directory layout the upstream serves —
-`<dest>/<project>/<os>/<arch>/versions.txt` and `v<ver>.tar.{gz,xz}` — so the
+Sync a **local mirror of bottles** from a distribution — ours by default. It
+writes the layout a dist serves,
+`<dest>/<project>/<os>/<arch>/versions.txt` and `v<ver>.tar.{gz,xz}`, so the
 result can be served by any static file server (nginx, S3, Caddy…) and used by
-[pkgm](https://github.com/go-zpkg/zpkgm) / [pkgx](https://github.com/go-zpkg/zpkgx)
+[`zpkgm`](https://github.com/go-zpkg/zpkgm) / [`zpkgx`](https://github.com/go-zpkg/zpkgx)
 via `ZPKG_DIST=<mirror-url>`.
 
+The default source is `bottle.DistBase` — the registry our own factory
+publishes to, named in exactly one place so that it moves in one edit — and it
+is **not** an upstream pkgx dist: we are no longer compatible with pkgx and do
+not synchronise from it
+([packages#431](https://github.com/go-zpkg/packages/issues/431)). `mirror
+--help` prints whichever registry the binary you have is built against.
+
+Point `--from` wherever you like; verification then defaults off, as it always
+did, because an arbitrary dist may be unsigned — but mirroring from **our**
+signed registry keeps verification **on**, since the tree this writes is what
+somebody else installs from.
+
 Part of the pure-Go [go-zpkg](https://github.com/go-zpkg) family; shares the
-pkgx bottle protocol with pkgm and pkgx through
+bottle protocol with `zpkgm` and `zpkgx` through
 [`go-zpkg/bottle`](https://github.com/go-zpkg/bottle). `CGO_ENABLED=0`, one
 static binary.
 
@@ -63,7 +75,7 @@ everyone who happens to install that hour. To track releases instead, say so —
 mirror <project>[@constraint] ...   mirror the given projects' bottles
 
   -d, --dest DIR     mirror root (default $ZPKG_MIRROR or ./mirror)
-      --from URL     upstream dist to mirror from (default https://dist.pkgx.dev)
+      --from REF     dist to mirror from (default: bottle's own, see `mirror --help`)
       --to REF       ALSO push each bottle to an OCI registry
                      (e.g. oci://ghcr.io/you/bottles); additive to --dest
       --os OS        restrict to an OS (repeatable; default: linux, darwin)
