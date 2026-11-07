@@ -1,12 +1,21 @@
-// Command mirror synchronises a local mirror of pkgx bottles from an upstream
-// pkgx distribution (dist.pkgx.dev by default). It writes the same directory
-// layout the upstream serves — <dest>/<project>/<os>/<arch>/versions.txt and
-// v<ver>.tar.{gz,xz} — so the result can be served by any static file server
-// (nginx, S3, …) and used by pkgm/pkgx via `ZPKG_DIST=<mirror-url>`.
+// Command mirror synchronises a local mirror of bottles from a distribution —
+// OUR registry by default. It writes the layout a dist serves,
+// <dest>/<project>/<os>/<arch>/versions.txt and v<ver>.tar.{gz,xz}, so the
+// result can be served by any static file server (nginx, S3, …) and used by
+// zpkgm/zpkgx via `ZPKG_DIST=<mirror-url>`.
 //
-// It shares the pkgx bottle protocol (URLs, version parsing, tarball fetch)
-// with pkgm and pkgx through the github.com/go-zpkg/bottle package, so there is
-// one source of truth. Pure Go, CGO_ENABLED=0.
+// ⛔⛔ THE DEFAULT SOURCE WAS https://dist.pkgx.dev, SO `mirror wget` WITH NO
+// FLAGS SYNCHRONISED FROM UPSTREAM. We are no longer compatible with pkgx and
+// no longer synchronise from it (go-zpkg/packages#431): the pantry, the recipe
+// format and the distribution have parted, and a default pointing there
+// mirrored somebody else's artefacts under our name. The default is now
+// bottle.DefaultDistBase — the registry our own factory publishes to — and it
+// is taken from that constant rather than spelled again here, so it follows
+// the bottles if they ever move.
+//
+// It shares the bottle protocol (URLs, version parsing, tarball fetch) with
+// zpkgm and zpkgx through github.com/go-zpkg/bottle, so there is one source of
+// truth. Pure Go, CGO_ENABLED=0.
 package main
 
 import (
@@ -22,14 +31,32 @@ import (
 // overridden at release-build time via -ldflags "-X main.version=<tag>".
 var version = "dev"
 
-var usage = `mirror ` + version + ` — sync a local mirror of pkgx bottles
+// ourDist is the registry this mirror pulls from unless --from says otherwise:
+// bottle's own default, captured ONCE at load.
+//
+// ⛔ CAPTURED, BECAUSE THIS PROGRAM OVERWRITES THAT VARIABLE. run() assigns
+// `bottle.DistBase = o.from` to point the shared backend at the source, so
+// reading bottle.DistBase later would give whatever --from was, and the
+// "default" printed in --help or used by a second parse would be the last
+// value passed. Package variables initialise before main, and imported
+// packages before this one, so this holds the pristine value.
+//
+// Taken from bottle rather than spelled again here: that is the whole fix.
+// The README of bottle itself stated a default its constant contradicted for
+// weeks (go-zpkg/bottle#218), and a second literal in this repository would
+// be one more place to forget.
+var ourDist = bottle.DistBase
+
+func defaultFrom() string { return ourDist }
+
+var usage = `mirror ` + version + ` — sync a local mirror of bottles
 
 usage:
   mirror <project>[@constraint] ...   mirror the given projects' bottles
 
 flags:
   -d, --dest DIR     mirror root (default $ZPKG_MIRROR or ./mirror)
-      --from URL     upstream dist to mirror from (default https://dist.pkgx.dev)
+      --from REF     dist to mirror from (default ` + defaultFrom() + `)
       --to REF       ALSO push each bottle to an OCI registry
                      (e.g. oci://ghcr.io/go-zpkg/bottles); additive to --dest
       --os OS        restrict to an OS (repeatable; default: linux, darwin)
@@ -67,16 +94,29 @@ var (
 	setenv    = os.Setenv
 )
 
-// ensureMirrorVerifyDefault turns install-time signature verification OFF for a
-// mirror run unless the operator set ZPKG_VERIFY explicitly. Mirroring copies
-// upstream bytes as-is (it is not an install), and bottle now verifies by
-// default — so without this a default `mirror --from https://dist.pkgx.dev`
-// (unsigned upstream) would fail closed. An explicit ZPKG_VERIFY=1 still wins
-// (e.g. to mirror only from a signed dist).
-func ensureMirrorVerifyDefault() {
-	if _, ok := lookupEnv("ZPKG_VERIFY"); !ok {
-		_ = setenv("ZPKG_VERIFY", "0")
+// ensureMirrorVerifyDefault turns install-time signature verification off for
+// a mirror run, unless the operator set ZPKG_VERIFY explicitly OR the source
+// is our own signed registry.
+//
+// ⛔⛔ THE EXEMPTION'S REASON DIED WITH THE DEFAULT IT WAS WRITTEN FOR. It
+// said: "a default `mirror --from https://dist.pkgx.dev` (unsigned upstream)
+// would fail closed". True while that was the default. Now the default is our
+// own dist, whose bottles are signed — and silently copying from a SIGNED
+// source with verification off is the one case this must not do, because the
+// mirror it writes is what somebody else then installs from.
+//
+// So the exemption is scoped to what justified it: a source the operator
+// pointed elsewhere. Default source → verify stays on, fail-closed. Explicit
+// --from somewhere else → off by default, since an arbitrary dist may be
+// unsigned, and ZPKG_VERIFY=1 still wins.
+func ensureMirrorVerifyDefault(from string) {
+	if _, ok := lookupEnv("ZPKG_VERIFY"); ok {
+		return // the operator said; nothing to default
 	}
+	if strings.TrimRight(from, "/") == strings.TrimRight(ourDist, "/") {
+		return // our own signed registry: verifying is the point
+	}
+	_ = setenv("ZPKG_VERIFY", "0")
 }
 
 func run(argv []string) int {
@@ -97,7 +137,7 @@ func run(argv []string) int {
 		fmt.Fprint(os.Stderr, usage)
 		return 2
 	}
-	ensureMirrorVerifyDefault()
+	ensureMirrorVerifyDefault(o.from)
 	// The upstream to pull from is explicit (NOT $ZPKG_DIST, which is for
 	// consumers reading a mirror) — set it on the shared backend.
 	bottle.DistBase = strings.TrimRight(o.from, "/")
@@ -110,7 +150,7 @@ func run(argv []string) int {
 
 // parseArgs splits flags from positional package specs.
 func parseArgs(argv []string) (pos []string, o opts, help, showVer bool, err error) {
-	o = opts{dest: defaultDest(), from: "https://dist.pkgx.dev"}
+	o = opts{dest: defaultDest(), from: defaultFrom()}
 	for i := 0; i < len(argv); i++ {
 		a := argv[i]
 		next := func() (string, bool) {

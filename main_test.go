@@ -200,21 +200,72 @@ func TestEnsureMirrorVerifyDefault(t *testing.T) {
 	ol, os_ := lookupEnv, setenv
 	defer func() { lookupEnv, setenv = ol, os_ }()
 
-	// ZPKG_VERIFY unset → mirror defaults it off.
+	// ZPKG_VERIFY unset, mirroring from SOMEWHERE ELSE → defaults it off,
+	// because an arbitrary dist may be unsigned and the run would otherwise
+	// fail closed. This is the case the exemption was written for.
 	var set string
 	setCalled := false
 	lookupEnv = func(string) (string, bool) { return "", false }
 	setenv = func(_, v string) error { setCalled = true; set = v; return nil }
-	ensureMirrorVerifyDefault()
+	ensureMirrorVerifyDefault("https://some.other.dist")
 	if !setCalled || set != "0" {
-		t.Fatalf("unset ZPKG_VERIFY → want set to 0, got set=%v value=%q", setCalled, set)
+		t.Fatalf("unset ZPKG_VERIFY from a foreign dist → want set to 0, got set=%v value=%q",
+			setCalled, set)
 	}
 
 	// ZPKG_VERIFY set explicitly → mirror must NOT override it.
 	lookupEnv = func(string) (string, bool) { return "1", true }
 	setCalled = false
-	ensureMirrorVerifyDefault()
+	ensureMirrorVerifyDefault("https://some.other.dist")
 	if setCalled {
 		t.Fatal("explicit ZPKG_VERIFY must not be overridden")
+	}
+}
+
+// ⛔⛔ THE EXEMPTION MUST NOT COVER OUR OWN SIGNED REGISTRY. It was written
+// when the default source was the unsigned upstream dist; with the default
+// now our own, copying from a SIGNED source with verification off is the one
+// case this must not do, because the mirror it writes is what somebody else
+// installs from.
+func TestVerificationStaysOnForOurOwnDist(t *testing.T) {
+	ol, os_ := lookupEnv, setenv
+	defer func() { lookupEnv, setenv = ol, os_ }()
+
+	setCalled := false
+	lookupEnv = func(string) (string, bool) { return "", false }
+	setenv = func(_, _ string) error { setCalled = true; return nil }
+
+	ensureMirrorVerifyDefault(ourDist)
+	if setCalled {
+		t.Error("mirroring from our own signed registry must leave verification on")
+	}
+	// A trailing slash is the same registry, and must not slip through.
+	setCalled = false
+	ensureMirrorVerifyDefault(ourDist + "/")
+	if setCalled {
+		t.Error("a trailing slash made the same registry look foreign")
+	}
+}
+
+// The default source is bottle's, not a second literal here — the defect that
+// made bottle's own README state a registry its constant contradicted
+// (go-zpkg/bottle#218). It is also NOT the upstream dist any more: we are no
+// longer compatible with pkgx and do not synchronise from it.
+func TestTheDefaultSourceIsOurs(t *testing.T) {
+	if ourDist != bottle.DistBase {
+		t.Errorf("ourDist = %q, want bottle's own default %q", ourDist, bottle.DistBase)
+	}
+	if strings.Contains(ourDist, "dist.pkgx.dev") {
+		t.Errorf("the default source is still the upstream dist: %q", ourDist)
+	}
+	_, o, _, _, err := parseArgs([]string{"wget"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o.from != ourDist {
+		t.Errorf("parseArgs default --from = %q, want %q", o.from, ourDist)
+	}
+	if !strings.Contains(usage, ourDist) {
+		t.Errorf("--help does not name the real default %q", ourDist)
 	}
 }
