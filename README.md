@@ -13,8 +13,8 @@ via `ZPKG_DIST=<mirror-url>`.
 
 The default source is `bottle.DistBase` — the registry our own factory
 publishes to, named in exactly one place so that it moves in one edit — and it
-is **not** an upstream pkgx dist: we are no longer compatible with pkgx and do
-not synchronise from it
+is **not** a dist from upstream pkgx.sh: we are no longer compatible with it
+and do not synchronise from it
 ([packages#431](https://github.com/go-zpkg/packages/issues/431)). `mirror
 --help` prints whichever registry the binary you have is built against.
 
@@ -100,7 +100,7 @@ $ mirror --closure agwa.name/git-crypt --os linux --arch aarch64 --dest ./m
 $ (cd ./m && python3 -m http.server 8080) &
 # a plain static (HTTP) mirror carries no signatures, so opt out of the
 # default-on signature check when consuming it (ZPKG_VERIFY=0)
-$ ZPKG_VERIFY=0 ZPKG_DIST=http://localhost:8080 pkgm run agwa.name/git-crypt -- --version
+$ ZPKG_VERIFY=0 ZPKG_DIST=http://localhost:8080 zpkgm run agwa.name/git-crypt -- --version
 git-crypt 0.8.0
 ```
 

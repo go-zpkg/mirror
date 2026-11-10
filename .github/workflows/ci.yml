@@ -53,7 +53,8 @@ jobs:
         with:
           go-version: '1.27.3'
       # A CGO_ENABLED=0 build must be fully static on every 64-bit target,
-      # so pkgm can ship on a `FROM scratch` image for each arch.
+      # so `mirror` -- the binary the step below builds -- can ship on a
+      # `FROM scratch` image for each arch.
       - env:
           CGO_ENABLED: "0"
           GOOS: ${{ matrix.goos }}
