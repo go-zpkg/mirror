@@ -15,7 +15,7 @@ import (
 // Sigstore-signed statement that THIS workflow built THAT file from THAT
 // commit.
 //
-// Measured 2026-10-20 on go-zpkg/zpkgx v0.23.1, with go-fleettools' relverify:
+// Measured 2026-10-20 on go-zpkg/zpkx v0.23.1, with go-fleettools' relverify:
 // twelve files, every checksum right, and every attestation lookup
 // `HTTP 404: Not Found`. The same was true of this repository, of go-zpkg/bk
 // and of go-zpkg/pkgm — releases that verify as far as a manifest can take
