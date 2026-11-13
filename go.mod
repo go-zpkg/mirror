@@ -2,9 +2,9 @@ module github.com/go-zpkg/mirror
 
 go 1.27.4
 
-require github.com/go-zpkg/bottle v0.86.0
-
 // Local development: build against the in-tree bottle (adds the OCI transport).
+
+require github.com/go-zpkg/artifact v0.87.0
 
 require (
 	github.com/agext/levenshtein v1.2.1 // indirect

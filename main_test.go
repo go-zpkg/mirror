@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-zpkg/bottle"
+	"github.com/go-zpkg/artifact"
 )
 
 func TestParseArgs(t *testing.T) {
@@ -41,8 +41,8 @@ func TestParseArgs(t *testing.T) {
 }
 
 func TestParseArgsTo(t *testing.T) {
-	_, o, _, _, err := parseArgs([]string{"--to", "oci://ghcr.io/go-zpkg/bottles", "wget"})
-	if err != nil || o.to != "oci://ghcr.io/go-zpkg/bottles" {
+	_, o, _, _, err := parseArgs([]string{"--to", "oci://ghcr.io/go-zpkg/artifacts", "wget"})
+	if err != nil || o.to != "oci://ghcr.io/go-zpkg/artifacts" {
 		t.Fatalf("--to = %q err=%v", o.to, err)
 	}
 	_, o2, _, _, _ := parseArgs([]string{"--to=oci://reg/x", "wget"})
@@ -69,7 +69,7 @@ func TestParseSpecAndSelect(t *testing.T) {
 	if p, c := parseSpec("node@^22"); p != "node" || c != "^22" {
 		t.Errorf("parseSpec = %q %q", p, c)
 	}
-	vs := []bottle.Ver{bottle.ParseVer("1.0.0"), bottle.ParseVer("1.5.0"), bottle.ParseVer("2.0.0")}
+	vs := []artifact.Ver{artifact.ParseVer("1.0.0"), artifact.ParseVer("1.5.0"), artifact.ParseVer("2.0.0")}
 	// latest matching
 	if got := selectVersions(vs, "^1", false); len(got) != 1 || got[0].Raw != "1.5.0" {
 		t.Errorf("latest ^1 = %v", got)
@@ -97,15 +97,15 @@ func fakeDist(t *testing.T) (*httptest.Server, func()) {
 		case strings.HasSuffix(p, "/versions.txt"):
 			fmt.Fprint(w, "1.0.0\n2.0.0\n")
 		case strings.HasSuffix(p, ".tar.gz"):
-			w.Write([]byte("bottle-bytes-" + filepath.Base(p)))
+			w.Write([]byte("artifact-bytes-" + filepath.Base(p)))
 		default:
 			http.NotFound(w, r) // .tar.xz etc.
 		}
 	})
 	srv := httptest.NewServer(mux)
-	sd, sp := bottle.DistBase, bottle.PantryBase
-	bottle.DistBase, bottle.PantryBase = srv.URL, srv.URL
-	return srv, func() { bottle.DistBase, bottle.PantryBase = sd, sp; srv.Close() }
+	sd, sp := artifact.DistBase, artifact.PantryBase
+	artifact.DistBase, artifact.PantryBase = srv.URL, srv.URL
+	return srv, func() { artifact.DistBase, artifact.PantryBase = sd, sp; srv.Close() }
 }
 
 func TestExpandClosure(t *testing.T) {
@@ -133,14 +133,14 @@ func TestExpandClosure(t *testing.T) {
 }
 
 func TestMirrorClosure(t *testing.T) {
-	// mirror deliberately pulls unsigned bottles from an HTTP upstream; this test
+	// mirror deliberately pulls unsigned artifacts from an HTTP upstream; this test
 	// exercises the transport, not verification policy, so opt out of the (now
 	// default-on) signature check against the in-memory fake.
 	t.Setenv("ZPKG_VERIFY", "0")
 	_, cleanup := fakeDist(t)
 	defer cleanup()
 	dest := t.TempDir()
-	o := opts{dest: dest, from: bottle.DistBase, oses: []string{"linux"}, arches: []string{"aarch64"}, closure: true}
+	o := opts{dest: dest, from: artifact.DistBase, oses: []string{"linux"}, arches: []string{"aarch64"}, closure: true}
 	if err := mirror([]string{"acme.org/tool"}, o); err != nil {
 		t.Fatal(err)
 	}
@@ -154,14 +154,14 @@ func TestMirrorClosure(t *testing.T) {
 }
 
 func TestMirrorEndToEnd(t *testing.T) {
-	// mirror deliberately pulls unsigned bottles from an HTTP upstream; this test
+	// mirror deliberately pulls unsigned artifacts from an HTTP upstream; this test
 	// exercises the transport, not verification policy, so opt out of the (now
 	// default-on) signature check against the in-memory fake.
 	t.Setenv("ZPKG_VERIFY", "0")
 	_, cleanup := fakeDist(t)
 	defer cleanup()
 	dest := t.TempDir()
-	o := opts{dest: dest, from: bottle.DistBase, oses: []string{"linux"}, arches: []string{"x86-64"}, allVersions: true}
+	o := opts{dest: dest, from: artifact.DistBase, oses: []string{"linux"}, arches: []string{"x86-64"}, allVersions: true}
 
 	if err := mirror([]string{"acme.org/tool"}, o); err != nil {
 		t.Fatal(err)
@@ -247,13 +247,13 @@ func TestVerificationStaysOnForOurOwnDist(t *testing.T) {
 	}
 }
 
-// The default source is bottle's, not a second literal here — the defect that
-// made bottle's own README state a registry its constant contradicted
-// (go-zpkg/bottle#218). It is also NOT the upstream dist any more: we are no
+// The default source is artifact's, not a second literal here — the defect that
+// made artifact's own README state a registry its constant contradicted
+// (go-zpkg/artifact#218). It is also NOT the upstream dist any more: we are no
 // longer compatible with pkgx and do not synchronise from it.
 func TestTheDefaultSourceIsOurs(t *testing.T) {
-	if ourDist != bottle.DistBase {
-		t.Errorf("ourDist = %q, want bottle's own default %q", ourDist, bottle.DistBase)
+	if ourDist != artifact.DistBase {
+		t.Errorf("ourDist = %q, want artifact's own default %q", ourDist, artifact.DistBase)
 	}
 	if strings.Contains(ourDist, "dist.pkgx.dev") {
 		t.Errorf("the default source is still the upstream dist: %q", ourDist)

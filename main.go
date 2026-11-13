@@ -1,4 +1,4 @@
-// Command mirror synchronises a local mirror of bottles from a distribution —
+// Command mirror synchronises a local mirror of artifacts from a distribution —
 // OUR registry by default. It writes the layout a dist serves,
 // <dest>/<project>/<os>/<arch>/versions.txt and v<ver>.tar.{gz,xz}, so the
 // result can be served by any static file server (nginx, S3, …) and used by
@@ -9,12 +9,12 @@
 // no longer synchronise from it (go-zpkg/packages#431): the pantry, the recipe
 // format and the distribution have parted, and a default pointing there
 // mirrored somebody else's artefacts under our name. The default is now
-// bottle.DefaultDistBase — the registry our own factory publishes to — and it
+// artifact.DefaultDistBase — the registry our own factory publishes to — and it
 // is taken from that constant rather than spelled again here, so it follows
-// the bottles if they ever move.
+// the artifacts if they ever move.
 //
-// It shares the bottle protocol (URLs, version parsing, tarball fetch) with
-// zpkgm and zpkgx through github.com/go-zpkg/bottle, so there is one source of
+// It shares the artifact protocol (URLs, version parsing, tarball fetch) with
+// zpkgm and zpkgx through github.com/go-zpkg/artifact, so there is one source of
 // truth. Pure Go, CGO_ENABLED=0.
 package main
 
@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/go-zpkg/bottle"
+	"github.com/go-zpkg/artifact"
 )
 
 // version is reported by `mirror --version`. It defaults to "dev" and is
@@ -32,33 +32,33 @@ import (
 var version = "dev"
 
 // ourDist is the registry this mirror pulls from unless --from says otherwise:
-// bottle's own default, captured ONCE at load.
+// artifact's own default, captured ONCE at load.
 //
 // ⛔ CAPTURED, BECAUSE THIS PROGRAM OVERWRITES THAT VARIABLE. run() assigns
-// `bottle.DistBase = o.from` to point the shared backend at the source, so
-// reading bottle.DistBase later would give whatever --from was, and the
+// `artifact.DistBase = o.from` to point the shared backend at the source, so
+// reading artifact.DistBase later would give whatever --from was, and the
 // "default" printed in --help or used by a second parse would be the last
 // value passed. Package variables initialise before main, and imported
 // packages before this one, so this holds the pristine value.
 //
-// Taken from bottle rather than spelled again here: that is the whole fix.
-// The README of bottle itself stated a default its constant contradicted for
-// weeks (go-zpkg/bottle#218), and a second literal in this repository would
+// Taken from artifact rather than spelled again here: that is the whole fix.
+// The README of artifact itself stated a default its constant contradicted for
+// weeks (go-zpkg/artifact#218), and a second literal in this repository would
 // be one more place to forget.
-var ourDist = bottle.DistBase
+var ourDist = artifact.DistBase
 
 func defaultFrom() string { return ourDist }
 
-var usage = `mirror ` + version + ` — sync a local mirror of bottles
+var usage = `mirror ` + version + ` — sync a local mirror of artifacts
 
 usage:
-  mirror <project>[@constraint] ...   mirror the given projects' bottles
+  mirror <project>[@constraint] ...   mirror the given projects' artifacts
 
 flags:
   -d, --dest DIR     mirror root (default $ZPKG_MIRROR or ./mirror)
       --from REF     dist to mirror from (default ` + defaultFrom() + `)
-      --to REF       ALSO push each bottle to an OCI registry
-                     (e.g. oci://ghcr.io/go-zpkg/bottles); additive to --dest
+      --to REF       ALSO push each artifact to an OCI registry
+                     (e.g. oci://ghcr.io/go-zpkg/artifacts); additive to --dest
       --os OS        restrict to an OS (repeatable; default: linux, darwin)
       --arch ARCH    restrict to an arch (repeatable; default: x86-64, aarch64)
       --all-versions mirror every version (default: the latest matching one)
@@ -68,8 +68,8 @@ flags:
   -v, --version      show version
 
 Serve <dest> statically and point tools at it:  ZPKG_DIST=https://my.mirror pkgx …
-Or push to an OCI registry and pull from it:      mirror wget --to oci://ghcr.io/you/bottles
-                                                  ZPKG_DIST=oci://ghcr.io/you/bottles pkgx wget
+Or push to an OCI registry and pull from it:      mirror wget --to oci://ghcr.io/you/artifacts
+                                                  ZPKG_DIST=oci://ghcr.io/you/artifacts pkgx wget
 
 OCI push credentials (optional; anonymous works for public pulls) come from the
 environment: OCI_TOKEN (a pre-issued bearer) or OCI_USERNAME / OCI_PASSWORD.
@@ -101,7 +101,7 @@ var (
 // ⛔⛔ THE EXEMPTION'S REASON DIED WITH THE DEFAULT IT WAS WRITTEN FOR. It
 // said: "a default `mirror --from https://dist.pkgx.dev` (unsigned upstream)
 // would fail closed". True while that was the default. Now the default is our
-// own dist, whose bottles are signed — and silently copying from a SIGNED
+// own dist, whose artifacts are signed — and silently copying from a SIGNED
 // source with verification off is the one case this must not do, because the
 // mirror it writes is what somebody else then installs from.
 //
@@ -140,7 +140,7 @@ func run(argv []string) int {
 	ensureMirrorVerifyDefault(o.from)
 	// The upstream to pull from is explicit (NOT $ZPKG_DIST, which is for
 	// consumers reading a mirror) — set it on the shared backend.
-	bottle.DistBase = strings.TrimRight(o.from, "/")
+	artifact.DistBase = strings.TrimRight(o.from, "/")
 	if err := mirror(pos, o); err != nil {
 		fmt.Fprintln(os.Stderr, "mirror: "+err.Error())
 		return 1
@@ -230,12 +230,12 @@ func mirror(specs []string, o opts) error {
 		specs = expanded
 	}
 	// Optional OCI push target (additive to --dest).
-	var oci *bottle.OCIClient
+	var oci *artifact.OCIClient
 	if o.to != "" {
-		if !bottle.IsOCI(o.to) {
+		if !artifact.IsOCI(o.to) {
 			return fmt.Errorf("--to must be an oci:// ref, got %q", o.to)
 		}
-		c, err := bottle.NewOCIClient(o.to)
+		c, err := artifact.NewOCIClient(o.to)
 		if err != nil {
 			return err
 		}
@@ -246,9 +246,9 @@ func mirror(specs []string, o opts) error {
 		project, constraint := parseSpec(spec)
 		for _, osn := range o.oses {
 			for _, arch := range o.arches {
-				vs, err := bottle.VersionsFor(project, osn, arch)
+				vs, err := artifact.VersionsFor(project, osn, arch)
 				if err != nil {
-					// no bottles for this os/arch (common) — not fatal.
+					// no artifacts for this os/arch (common) — not fatal.
 					fmt.Printf("  skip   %s %s/%s (no versions)\n", project, osn, arch)
 					continue
 				}
@@ -277,12 +277,12 @@ func mirror(specs []string, o opts) error {
 	return nil
 }
 
-// mirrorOne copies a single bottle into the static tree if it is not already
+// mirrorOne copies a single artifact into the static tree if it is not already
 // mirrored, and — when an OCI target is configured — also pushes it to the
 // registry. It returns (fetched, skipped, pushed) counts (each 0 or 1). When the
-// bottle is already present in the static tree it is read from disk so it can
+// artifact is already present in the static tree it is read from disk so it can
 // still be pushed to OCI (the --to push is additive to --dest, not gated by it).
-func mirrorOne(project, ver, osn, arch string, o opts, oci *bottle.OCIClient) (fetched, skipped, pushed int, err error) {
+func mirrorOne(project, ver, osn, arch string, o opts, oci *artifact.OCIClient) (fetched, skipped, pushed int, err error) {
 	dir := filepath.Join(o.dest, filepath.FromSlash(project), osn, arch)
 	var data []byte
 	var ext string
@@ -301,7 +301,7 @@ func mirrorOne(project, ver, osn, arch string, o opts, oci *bottle.OCIClient) (f
 	if cached {
 		skipped = 1
 	} else {
-		data, ext, err = bottle.DownloadBottle(project, ver, osn, arch)
+		data, ext, err = artifact.DownloadArtifact(project, ver, osn, arch)
 		if err != nil {
 			return 0, 0, 0, err
 		}
@@ -315,15 +315,15 @@ func mirrorOne(project, ver, osn, arch string, o opts, oci *bottle.OCIClient) (f
 		fmt.Printf("  fetch  %s v%s %s/%s (%d KiB)\n", project, ver, osn, arch, len(data)/1024)
 	}
 	if oci != nil {
-		// Carry the bottle's attestations across when the SOURCE is a registry
+		// Carry the artifact's attestations across when the SOURCE is a registry
 		// that has them. A copy without the SBOM, provenance and signature is a
 		// downgrade: verification is fail-closed by default, so a consumer of
 		// this mirror would either be refused or be told to turn verification
 		// off. (A static HTTP dist has no referrers to carry — attestations are
-		// an OCI notion — so that path pushes the bottle alone, as before.)
-		var refs []bottle.Referrer
+		// an OCI notion — so that path pushes the artifact alone, as before.)
+		var refs []artifact.Referrer
 		var ann map[string]string
-		if src, err := bottle.NewOCIClient(bottle.DistBase); err == nil {
+		if src, err := artifact.NewOCIClient(artifact.DistBase); err == nil {
 			if r, a, err := src.FetchAttestations(project, ver, osn, arch); err == nil {
 				refs, ann = r, a
 			} else {
@@ -336,7 +336,7 @@ func mirrorOne(project, ver, osn, arch string, o opts, oci *bottle.OCIClient) (f
 		pushed = 1
 		signed := ""
 		for _, r := range refs {
-			if r.ArtifactType == bottle.ArtifactTypeSignature {
+			if r.ArtifactType == artifact.ArtifactTypeSignature {
 				signed = " +signature"
 			}
 		}
@@ -347,7 +347,7 @@ func mirrorOne(project, ver, osn, arch string, o opts, oci *bottle.OCIClient) (f
 
 // writeVersions writes the mirror's versions.txt for a project/os/arch, listing
 // the versions present in the mirror (one per line, ascending).
-func writeVersions(dest, project, osn, arch string, vs []bottle.Ver) error {
+func writeVersions(dest, project, osn, arch string, vs []artifact.Ver) error {
 	dir := filepath.Join(dest, filepath.FromSlash(project), osn, arch)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
@@ -362,8 +362,8 @@ func writeVersions(dest, project, osn, arch string, vs []bottle.Ver) error {
 
 // selectVersions returns the versions to mirror: all that satisfy the
 // constraint when allVersions is set, else just the highest matching one.
-func selectVersions(vs []bottle.Ver, constraint string, allVersions bool) []bottle.Ver {
-	var match []bottle.Ver
+func selectVersions(vs []artifact.Ver, constraint string, allVersions bool) []artifact.Ver {
+	var match []artifact.Ver
 	for _, v := range vs { // vs is ascending
 		if v.Satisfies(constraint) {
 			match = append(match, v)
@@ -378,7 +378,7 @@ func selectVersions(vs []bottle.Ver, constraint string, allVersions bool) []bott
 // implicitRoots are the system libraries pkgm/pkgx complete from ELF NEEDED on a
 // FROM-scratch image (they are not in any package's declared graph): the glibc
 // loader+libc that every dynamic ELF needs, and the gcc runtime (libgcc_s /
-// libstdc++ / libatomic) that C/C++ bottles link. --closure pulls these (and
+// libstdc++ / libatomic) that C/C++ artifacts link. --closure pulls these (and
 // their own deps) so the mirror is complete for a scratch consumer.
 var implicitRoots = []string{"gnu.org/glibc", "gnu.org/gcc/libstdcxx"}
 
@@ -398,9 +398,9 @@ func expandClosure(specs []string) ([]string, error) {
 	}
 	for _, spec := range roots {
 		project, constraint := parseSpec(spec)
-		closure, err := bottle.ResolveClosure(map[string]string{project: constraint})
+		closure, err := artifact.ResolveClosure(map[string]string{project: constraint})
 		if err != nil {
-			// The closure resolves against the HOST arch; a root with no bottle
+			// The closure resolves against the HOST arch; a root with no artifact
 			// there (e.g. gnu.org/glibc has no darwin build) can't be walked —
 			// mirror the root itself at latest for the requested arch(es).
 			add(project, project)
