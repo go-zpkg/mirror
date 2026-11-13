@@ -13,7 +13,7 @@ via `ZPKG_DIST=<mirror-url>`.
 
 The default source is `bottle.DistBase` — the registry our own factory
 publishes to, named in exactly one place so that it moves in one edit — and it
-is **not** a dist from upstream pkgx.sh: we are no longer compatible with it
+is **not** a dist from pkgx.sh: we are no longer compatible with it
 and do not synchronise from it
 ([packages#431](https://github.com/go-zpkg/packages/issues/431)). `mirror
 --help` prints whichever registry the binary you have is built against.
