@@ -4,14 +4,14 @@
 ![Go](https://img.shields.io/badge/Go-1.27%2B-00ADD8?logo=go&logoColor=white)
 ![License](https://img.shields.io/badge/license-BSD--3--Clause-blue)
 
-Sync a **local mirror of bottles** from a distribution — ours by default. It
+Sync a **local mirror of artifacts** from a distribution — ours by default. It
 writes the layout a dist serves,
 `<dest>/<project>/<os>/<arch>/versions.txt` and `v<ver>.tar.{gz,xz}`, so the
 result can be served by any static file server (nginx, S3, Caddy…) and used by
 [`zpkgm`](https://github.com/go-zpkg/zpkgm) / [`zpkgx`](https://github.com/go-zpkg/zpkgx)
 via `ZPKG_DIST=<mirror-url>`.
 
-The default source is `bottle.DistBase` — the registry our own factory
+The default source is `artifact.DistBase` — the registry our own factory
 publishes to, named in exactly one place so that it moves in one edit — and it
 is **not** a dist from pkgx.sh: we are no longer compatible with it
 and do not synchronise from it
@@ -24,8 +24,8 @@ signed registry keeps verification **on**, since the tree this writes is what
 somebody else installs from.
 
 Part of the pure-Go [go-zpkg](https://github.com/go-zpkg) family; shares the
-bottle protocol with `zpkgm` and `zpkgx` through
-[`go-zpkg/bottle`](https://github.com/go-zpkg/bottle). `CGO_ENABLED=0`, one
+artifact protocol with `zpkgm` and `zpkgx` through
+[`go-zpkg/artifact`](https://github.com/go-zpkg/artifact). `CGO_ENABLED=0`, one
 static binary.
 
 ## Install
@@ -72,12 +72,12 @@ everyone who happens to install that hour. To track releases instead, say so —
 ## Usage
 
 ```
-mirror <project>[@constraint] ...   mirror the given projects' bottles
+mirror <project>[@constraint] ...   mirror the given projects' artifacts
 
   -d, --dest DIR     mirror root (default $ZPKG_MIRROR or ./mirror)
-      --from REF     dist to mirror from (default: bottle's own, see `mirror --help`)
-      --to REF       ALSO push each bottle to an OCI registry
-                     (e.g. oci://ghcr.io/you/bottles); additive to --dest
+      --from REF     dist to mirror from (default: artifact's own, see `mirror --help`)
+      --to REF       ALSO push each artifact to an OCI registry
+                     (e.g. oci://ghcr.io/you/artifacts); additive to --dest
       --os OS        restrict to an OS (repeatable; default: linux, darwin)
       --arch ARCH    restrict to an arch (repeatable; default: x86-64, aarch64)
       --all-versions mirror every version (default: the latest matching one)
@@ -104,7 +104,7 @@ $ ZPKG_VERIFY=0 ZPKG_DIST=http://localhost:8080 zpkgm run agwa.name/git-crypt --
 git-crypt 0.8.0
 ```
 
-It is incremental — bottles already present are skipped — and re-runnable to
+It is incremental — artifacts already present are skipped — and re-runnable to
 keep a mirror up to date. `--closure` pins each dependency to the version the
 resolver chose (so a package needing OpenSSL 1.1 gets `libssl.so.1.1`, not the
 latest 3.x).
@@ -124,7 +124,7 @@ test (s390x, qemu)  test (loong64, qemu)
 
 Cross-compiling proves the code builds for an architecture and says nothing
 about whether it works there. s390x is in that list because it is big-endian
-and nothing else here is, and mirroring bottles means reading tar, xz and OCI
+and nothing else here is, and mirroring artifacts means reading tar, xz and OCI
 manifests this code did not write.
 
 BSD-3-Clause.
