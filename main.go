@@ -2,7 +2,7 @@
 // OUR registry by default. It writes the layout a dist serves,
 // <dest>/<project>/<os>/<arch>/versions.txt and v<ver>.tar.{gz,xz}, so the
 // result can be served by any static file server (nginx, S3, …) and used by
-// zpkgm/zpkgx via `ZPKG_DIST=<mirror-url>`.
+// zpkm/zpkx via `ZPKG_DIST=<mirror-url>`.
 //
 // ⛔⛔ THE DEFAULT SOURCE WAS https://dist.pkgx.dev, SO `mirror wget` WITH NO
 // FLAGS SYNCHRONISED FROM UPSTREAM. We are no longer compatible with pkgx and
@@ -14,7 +14,7 @@
 // the artifacts if they ever move.
 //
 // It shares the artifact protocol (URLs, version parsing, tarball fetch) with
-// zpkgm and zpkgx through github.com/go-zpkg/artifact, so there is one source of
+// zpkm and zpkx through github.com/go-zpkg/artifact, so there is one source of
 // truth. Pure Go, CGO_ENABLED=0.
 package main
 

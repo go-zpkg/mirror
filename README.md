@@ -8,7 +8,7 @@ Sync a **local mirror of artifacts** from a distribution — ours by default. It
 writes the layout a dist serves,
 `<dest>/<project>/<os>/<arch>/versions.txt` and `v<ver>.tar.{gz,xz}`, so the
 result can be served by any static file server (nginx, S3, Caddy…) and used by
-[`zpkgm`](https://github.com/go-zpkg/zpkgm) / [`zpkgx`](https://github.com/go-zpkg/zpkgx)
+[`zpkm`](https://github.com/go-zpkg/zpkm) / [`zpkx`](https://github.com/go-zpkg/zpkx)
 via `ZPKG_DIST=<mirror-url>`.
 
 The default source is `artifact.DistBase` — the registry our own factory
@@ -24,7 +24,7 @@ signed registry keeps verification **on**, since the tree this writes is what
 somebody else installs from.
 
 Part of the pure-Go [go-zpkg](https://github.com/go-zpkg) family; shares the
-artifact protocol with `zpkgm` and `zpkgx` through
+artifact protocol with `zpkm` and `zpkx` through
 [`go-zpkg/artifact`](https://github.com/go-zpkg/artifact). `CGO_ENABLED=0`, one
 static binary.
 
@@ -100,7 +100,7 @@ $ mirror --closure agwa.name/git-crypt --os linux --arch aarch64 --dest ./m
 $ (cd ./m && python3 -m http.server 8080) &
 # a plain static (HTTP) mirror carries no signatures, so opt out of the
 # default-on signature check when consuming it (ZPKG_VERIFY=0)
-$ ZPKG_VERIFY=0 ZPKG_DIST=http://localhost:8080 zpkgm run agwa.name/git-crypt -- --version
+$ ZPKG_VERIFY=0 ZPKG_DIST=http://localhost:8080 zpkm run agwa.name/git-crypt -- --version
 git-crypt 0.8.0
 ```
 
